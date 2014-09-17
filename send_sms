@@ -1,28 +1,64 @@
 #!/usr/bin/perl
 
+my $auth = 'YWRtaW46MDBzdGVscw=='; # sniff it with Chrome web tools
+my $smskey = '541850c0'; # it works
+
+use URI::Encode 'uri_encode';
 use Getopt::Std;
 use strict;
 
 # check options
-if ( scalar(@ARGV) == 0 ) { die '$0 -l <line#> | -s <sim#> -t <dst_phone_number> # message text to stdin' } }
-my %options=(); getopts("l:s:t:", \%options);
+if ( scalar(@ARGV) == 0 ) { die '$0 -l <line#> | -s <sim#> -t <dst_phone_number> # message text to stdin' } 
+my %options=(); getopts("l:s:t:m:", \%options);
 
-my $tel = $options{t};
-my $line = 5;
-my $text = 'Overkill';
+my $tel  = $options{t} || die "No dst phone number, specify with -t";
+my $sim  = $options{s};
+my $line = $options{l} || get_line_by_sim($sim) or die "Cant get line# by sim# $sim, look at scheduler database";
+warn $line;
+my $text;
 
-my $cmd='curl "http://goip1.stelsdev.ru/default/en_US/sms_info.html?type=sms" -H "Pragma: no-cache" -H "Origin: http://goip1.stelsdev.ru" -H "Accept-Encoding: gzip,deflate" -H "Accept-Language: ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4,uk;q=0.2" -H "Authorization: Basic YWRtaW46MDBzdGVscw==" -H "Content-Type: application/x-www-form-urlencoded" -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8" -H "Cache-Control: no-cache" -H "User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.120 Safari/537.36" -H "Connection: keep-alive" -H "Referer: http://goip1.stelsdev.ru/default/en_US/tools.html?type=sms" --data "line=_line_&smskey=541850c0&action=SMS&telnum=%2B_tel_&smscontent=_text_&send=Send" --compressed';
+my ($device, $channel) = break_number($line);
 
-$cmd =~ s/_line_/$line/;
-$cmd =~ s/_tel_/$tel/;
-$cmd =~ s/_text_/$text/;
-system $cmd;
+local $\ = undef; # read entire stdin
+
+$text = $options{m} or print "reading message from stdin...\n", $text = (<>);
+
+if (length($text) < 1) { die "Bad message... $text " }
+
+$text = uri_encode($text);
+$tel  = uri_encode($tel);
+
+my $url = 'goip'.$device.'.stelsdev.ru';
+
+my $cmd='curl "_url_/default/en_US/sms_info.html?type=sms" -H "Pragma: no-cache" -H "Origin: _url_" -H "Accept-Encoding: gzip,deflate" -H "Accept-Language: ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4,uk;q=0.2" -H "Authorization: Basic _auth_" -H "Content-Type: application/x-www-form-urlencoded" -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8" -H "Cache-Control: no-cache" -H "User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.120 Safari/537.36" -H "Connection: keep-alive" -H "Referer: _url_/default/en_US/tools.html?type=sms" --data "line=_channel_&smskey=_smskey_&action=SMS&telnum=_tel_&smscontent=_text_&send=Send" --compressed|grep "Line "';
+
+	$cmd =~ s/_url_/$url/;
+	$cmd =~ s/_tel_/$tel/;
+	$cmd =~ s/_auth_/$auth/;
+	$cmd =~ s/_smskey_/$smskey/;
+	$cmd =~ s/_text_/$text/;
+	$cmd =~ s/_channel_/$channel/;
 
 
-sub break_numer
+warn $cmd;
+print `$cmd`;
+
+
+sub break_number    # get 231, reurns 2 and 31 - device number and channel number
 {
-	my $line = shift;
-	my $device = substr($line, 1, 1); my $channel = substr($line, 2, 2);
+	my $line = shift;  warn "break_number: $line";
+	my $device = substr($line, 0, 1); my $channel = substr($line, -2); warn $device;
 	if ( $device eq undef or $channel eq undef) { die "Bad line number: $line"}
 	return ($device, $channel)
 }
+
+sub get_line_by_sim
+{
+	my $sim = shift;
+	my $cmd = "mysql -ss scheduler -e  'select line_name from sim where sim_name=$sim limit 1'";
+	my $res = `$cmd`;
+	chomp $res; warn "get_line_by_sim: res ".$res;
+	return $res;
+}
+
+
