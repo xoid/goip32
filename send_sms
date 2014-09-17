@@ -1,0 +1,28 @@
+#!/usr/bin/perl
+
+use Getopt::Std;
+use strict;
+
+# check options
+if ( scalar(@ARGV) == 0 ) { die '$0 -l <line#> | -s <sim#> -t <dst_phone_number> # message text to stdin' } }
+my %options=(); getopts("l:s:t:", \%options);
+
+my $tel = $options{t};
+my $line = 5;
+my $text = 'Overkill';
+
+my $cmd='curl "http://goip1.stelsdev.ru/default/en_US/sms_info.html?type=sms" -H "Pragma: no-cache" -H "Origin: http://goip1.stelsdev.ru" -H "Accept-Encoding: gzip,deflate" -H "Accept-Language: ru-RU,ru;q=0.8,en-US;q=0.6,en;q=0.4,uk;q=0.2" -H "Authorization: Basic YWRtaW46MDBzdGVscw==" -H "Content-Type: application/x-www-form-urlencoded" -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8" -H "Cache-Control: no-cache" -H "User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.120 Safari/537.36" -H "Connection: keep-alive" -H "Referer: http://goip1.stelsdev.ru/default/en_US/tools.html?type=sms" --data "line=_line_&smskey=541850c0&action=SMS&telnum=%2B_tel_&smscontent=_text_&send=Send" --compressed';
+
+$cmd =~ s/_line_/$line/;
+$cmd =~ s/_tel_/$tel/;
+$cmd =~ s/_text_/$text/;
+system $cmd;
+
+
+sub break_numer
+{
+	my $line = shift;
+	my $device = substr($line, 1, 1); my $channel = substr($line, 2, 2);
+	if ( $device eq undef or $channel eq undef) { die "Bad line number: $line"}
+	return ($device, $channel)
+}
