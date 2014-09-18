@@ -34,6 +34,8 @@ do
 		if cat /tmp/.sms | fgrep Channel > /dev/null
 		then
 			echo `date '+%Y-%m-%d %H:%M:%S'` `cat /tmp/.sms` >> /tmp/sms.txt  # если успешно декодировалось то записать смс в файл, добавить время и new line
+			
+			(cat /usr/local/smb_scheduler/header; tail -100 /tmp/sms.txt; cat /usr/local/smb_scheduler/footer;) > /usr/local/smb_scheduler/sms.html
 			grep -o 'Ваш номер.*' /tmp/.sms|tr -d [Ваш номер.] >> /etc/phones
 		fi
 	fi
